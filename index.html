@@ -195,8 +195,30 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         function pass() {
           localStorage.setItem(LS_CODE, code);
+          function finish() { wrap.remove(); if (loading) loading.style.display = ''; resolve(); }
+          var ua = navigator.userAgent || '';
+          var isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+          var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+
+          // 아이폰(Safari)은 자동 설치 불가 → "설정 > 앱 설치" 안내 경고창. '확인했어요' 눌러야만 닫힘.
+          if (isIOS && !standalone) {
+            setMsg('인증되었습니다!', true);
+            var ov = document.createElement('div');
+            ov.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(40,36,30,0.55);display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px;';
+            ov.innerHTML =
+              '<div style="width:340px;max-width:90vw;background:#fff;border-radius:18px;padding:28px 24px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,0.18);">' +
+                '<div style="font-size:30px;margin-bottom:10px;">⚠️</div>' +
+                '<div style="font-size:16px;font-weight:700;color:#3a352c;margin-bottom:10px;">앱 설치를 꼭 해주세요</div>' +
+                '<div style="font-size:13.5px;color:#6a655c;line-height:1.7;margin-bottom:20px;">아이폰은 자동 설치가 안 됩니다.<br><b>설정 → 앱 설치</b> 화면에서 안내에 따라 홈 화면에 꼭 추가해 주세요.<br>(추가하지 않으면 기록이 사라질 수 있어요.)</div>' +
+                '<button id="__pochi_ios_ok" style="width:100%;padding:13px;border:none;border-radius:11px;background:#caa46a;color:#fff;font-size:15px;font-weight:700;cursor:pointer;">확인했어요</button>' +
+              '</div>';
+            document.body.appendChild(ov);
+            ov.querySelector('#__pochi_ios_ok').addEventListener('click', function () { ov.remove(); finish(); });
+            return;
+          }
+
+          // PC Chrome/Edge · 안드로이드 Chrome: 등록과 동시에 설치창 띄우기
           setMsg('인증되었습니다! 앱 설치를 진행해 주세요.', true);
-          // 등록과 동시에 앱 설치창 띄우기 (지원 브라우저: PC Chrome/Edge, 안드로이드 Chrome)
           var __p = window.__pwaPrompt;
           if (__p) {
             try {
@@ -206,7 +228,7 @@ document.addEventListener('DOMContentLoaded', async function() {
               }
             } catch (e) {}
           }
-          setTimeout(function () { wrap.remove(); if (loading) loading.style.display = ''; resolve(); }, 600);
+          setTimeout(finish, 600);
         }
 
         btn.disabled = true; btn.style.opacity = '0.6'; setMsg('확인 중...', true);
