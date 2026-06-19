@@ -59,6 +59,9 @@ document.addEventListener('DOMContentLoaded', async function() {
   });
   window.addEventListener('appinstalled', function () { window.__pwaPrompt = null; });
 
+  // 서비스워커를 게이트(로그인) 전에 미리 등록 → 첫 방문에도 라이선스 화면에서 설치 프롬프트가 뜨도록
+  if ('serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(function () {}); } catch (e) {} }
+
   // ===== 라이선스 게이트 (소비기록 가계부 전용 · 일정노션 라이선스와 별개) =====
   // 1) 배포한 Apps Script 웹앱 URL을 아래에 붙여넣으세요.
   const LICENSE_API = 'https://script.google.com/macros/s/AKfycbwzBBg-xOESg2w9fscWEJWsMp4Zfu_rCnCmtgt-WadWbY8bd7HIBw0juYH2SJsLJ1xQ/exec';
@@ -224,19 +227,34 @@ document.addEventListener('DOMContentLoaded', async function() {
           }
 
           // PC Chrome/Edge · 안드로이드 Chrome
-          var __p = window.__pwaPrompt;
-          if (__p) {
-            // 설치 프롬프트가 준비된 경우 → 바로 설치창 띄움
+          function doPrompt(p) {
             try {
-              __p.prompt();
-              if (__p.userChoice && __p.userChoice.then) {
-                __p.userChoice.then(function () { window.__pwaPrompt = null; }).catch(function () {});
+              p.prompt();
+              if (p.userChoice && p.userChoice.then) {
+                p.userChoice.then(function () { window.__pwaPrompt = null; }).catch(function () {});
               }
             } catch (e) {}
+          }
+          if (window.__pwaPrompt) {
+            // 설치 프롬프트가 이미 준비된 경우 → 바로 설치창 띄움
+            doPrompt(window.__pwaPrompt);
             setTimeout(finish, 600);
           } else {
-            // 브라우저가 설치 프롬프트를 안 준 경우(쿨다운/이미 설치 등) → 수동 설치 안내
-            showGuide('앱 설치를 꼭 해주세요', '설치 창이 자동으로 뜨지 않았어요.<br><b>주소창 오른쪽 설치 아이콘</b>을 누르거나,<br>가계부 안 <b>설정 → 앱 설치</b>에서 설치해 주세요.<br>(이미 설치했다면 그냥 닫고 진행하세요.)');
+            // 프롬프트가 아직 안 떴을 수 있음 → 잠깐(최대 2.5초) 기다렸다가 시도 (클릭 제스처 유효시간 내)
+            var handled = false;
+            var onReady = function () {
+              if (handled) return; handled = true;
+              window.removeEventListener('pwaPromptReady', onReady);
+              if (window.__pwaPrompt) doPrompt(window.__pwaPrompt);
+              setTimeout(finish, 600);
+            };
+            window.addEventListener('pwaPromptReady', onReady);
+            setTimeout(function () {
+              if (handled) return; handled = true;
+              window.removeEventListener('pwaPromptReady', onReady);
+              // 끝내 프롬프트가 안 뜨면 → 수동 설치 안내
+              showGuide('앱 설치를 꼭 해주세요', '설치 창이 자동으로 뜨지 않았어요.<br><b>주소창 오른쪽 설치 아이콘</b>을 누르거나,<br>가계부 안 <b>설정 → 앱 설치</b>에서 설치해 주세요.<br>(이미 설치했다면 그냥 닫고 진행하세요.)');
+            }, 2500);
           }
         }
 
